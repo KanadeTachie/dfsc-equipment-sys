@@ -85,7 +85,7 @@ const Reservation: React.FC = () => {
   const [borrowDate, setBorrowDate] = useState('')
   const [returnDate, setReturnDate] = useState('')
 
-  useEffect
+  // useEffect
   
   //console.log("item in the cart: ", cart)
   
@@ -119,7 +119,9 @@ const Reservation: React.FC = () => {
 
       
       // Insert borrower data
-      const { data: borrowerData, error: borrowerError } = await supabase.from('reservationform').insert([reservationform]).select();
+      const { data: borrowerData, error: borrowerError } = await 
+        supabase.from('reservationform')
+        .insert([reservationform]).select();
       
       if (borrowerError) throw borrowerError;
       
@@ -143,7 +145,10 @@ const Reservation: React.FC = () => {
       console.log('cart: ', cartItems)
 
       // Insert cart items data
-      const { data: cartItemsData, error: cartItemsError } = await supabase.from('cart_items').insert(cartItems);
+      const { data: cartItemsData, error: cartItemsError } = await 
+        supabase.from('cart_items')
+        .insert(cartItems);
+
       console.log('cart: ', cartItemsData)
       if (cartItemsError) throw cartItemsError;
 

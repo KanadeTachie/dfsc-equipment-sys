@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from '@/config/supabaseClient'
 import { Database } from '@/lib/types/supabase'
+import { revalidatePath } from 'next/cache'
 
 // Mock data for users with reservations
 const users = [
@@ -33,7 +34,7 @@ const users = [
 
 type Reservaton = {
   name: string;
-  status: boolean;
+  status: string;
   adviser: string;
   borrower_id: string;
   created_at: string;
@@ -100,17 +101,72 @@ export default function EquipmentReservation() {
   }, [])
 
 
-  const handleAction = (userId:number , action:boolean) => {
-    setReservations(prevReservations => 
-      prevReservations.map(user => 
-        user.id === userId 
-          ? { ...user, status: action === true ? true :  false }
-          : user
-      ).filter(user => user.status == false)
-    )
-  }
-  const filteredAndSortedReservations = useMemo(() => {
+  const handleAction = async (reservationId: number , action: 'pending' | 'accepted' | 'denied') => {
+    console.log("handle action...");
 
+    try{
+      let status = '';
+      if (action === 'accepted' || action === 'pending' || action === 'denied' ) {
+        status = action;
+      } else {
+        throw new Error('Invalid action');
+      }
+
+      const { data, error } = await supabase
+        .from('reservationform')
+        .update({status})
+        .eq('id', reservationId);
+
+      if (error) {
+        throw error;
+      } else {
+        console.log('User status updated');
+        window.location.reload();
+      }
+    } catch {
+      console.error('Error updating user status');
+    }
+  }
+
+  const handleDelete = async (reservationId: number) => {
+
+    const isConfirmed = window.confirm('Are you sure you want to delete this reservation?');
+
+    if(!isConfirmed) {
+      console.log("User deletion canceled");
+      return;
+    }
+
+    try {
+      console.log("deleting reservation items");
+
+      const result_cart = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('reservation_id', reservationId);
+
+
+      console.log("cart_items delete: ", result_cart);
+      console.log("deleting reservation items");
+
+      const result_res = await supabase
+        .from('reservationform')
+        .delete()
+        .eq('id', reservationId)
+
+      // if (result_res) {
+      //   throw result_res;
+      // }
+      console.log("cart_items delete: ", result_cart);
+      console.log("reservation deleted...");
+      
+      window.location.reload();
+    } catch {
+      console.error('Error deleting user');
+    }
+  }
+
+  const filteredAndSortedReservations = useMemo(() => {
     const mergedData = reservations.map(reservation => {      
       const borrowerProfile = profiles.find(profile => profile.id === reservation.borrower_id);      
       return {        
@@ -122,7 +178,7 @@ export default function EquipmentReservation() {
     return mergedData
       .filter(reservation =>  (reservation.borrowerName.toLowerCase().includes(search.toLowerCase()))
       ||  reservation.adviser.toLowerCase().includes(search.toLowerCase())
-      &&  (statusFilter === 'all' || reservation.status === (statusFilter === 'active'))
+      &&  (statusFilter === 'all')
       )
       .sort((a, b) => {        
         const dateA = new Date(a.created_at).getTime();        
@@ -130,22 +186,6 @@ export default function EquipmentReservation() {
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;      
       });
   }, [reservations, profiles, search, statusFilter, sortOrder]);
-
-
-  // const filteredAndSortedReservations = useMemo(() => {   OLD PROCESS, for reference only
-  //   return reservations
-  //     .filter(user => 
-  //       (user.name.toLowerCase().includes(search.toLowerCase()) ||
-  //        user.email.toLowerCase().includes(search.toLowerCase())) &&
-  //       (statusFilter === 'all' || user.status === statusFilter)
-  //     )
-  //     .sort((a, b) => {
-  //       const dateA = new Date(a.reservationDate).getTime()
-  //       const dateB = new Date(b.reservationDate).getTime()
-  //       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
-  //     })
-  // }, [reservations, search, statusFilter, sortOrder])
-
   
   
   // FIX ICON ERROR
@@ -216,14 +256,14 @@ export default function EquipmentReservation() {
                           </div>
                           <Badge
                             variant={ // !!! STILL NEED TO CHANGE BOOLEAN STATUS TO NEW 
-                              reservation.status === false
+                              reservation.status === 'accepted'
                                 ? 'secondary'
-                                : reservation.status === true
+                                : reservation.status === 'pending'
                                 ? 'default' // replace "default" with any available variant you prefer
                                 : 'destructive'
                             }
                           >
-                            {reservation.status === true ? 'accepted' : 'pending'}
+                            {reservation.status === 'accepted' ? 'accepted' : 'pending'}
                           </Badge>
 
                         </div>
@@ -232,13 +272,22 @@ export default function EquipmentReservation() {
                           <span>{reservation.created_at}</span>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium mb-1">Reserved Items:(!WIP)</span>
-                          {/* {user.items.slice(0, 3).map((item, index) => (
-                            <span key={item.id} className="text-sm ml-2">• {item.name}</span>
-                          ))} */}
-                          {/* {user.items.length > 3 && (
-                            <span className="text-sm ml-2">• +{user.items.length - 3} more</span>
-                          )} */}
+                          <span className="text-sm font-medium mb-1">Reserved Items:</span>
+                          {
+                            
+                            cart.filter((item) => item.reservation_id === reservation.id)
+                            .slice(0, 3)
+                            .map((item, index) => (
+                              <span key={item.id} className="text-sm ml-2">• {item.eqname}</span>
+                            ))  
+                          }
+                          {
+                            cart.filter((item) => item.reservation_id === reservation.id).length > 3 && (
+                              <span className="text-sm ml-2">• +{cart
+                                .filter((item) => item.reservation_id === reservation.id).length - 3} more</span>
+                            )
+                          }
+              
                         </div>
                       </div>
                     </Button>
@@ -258,7 +307,11 @@ export default function EquipmentReservation() {
                         <strong>Status:</strong> <Badge>{reservation.status}</Badge>
                       </div>
                       <div>
-                        <strong>Total Items:</strong> !WIP
+                        <strong>Total Items:&nbsp;
+                          {
+                            cart.filter((item) => item.reservation_id === reservation.id).length
+                          }
+                        </strong> 
                       </div>
                       <ScrollArea className="h-[300px] w-full rounded-md border p-4">
                         <Table>
@@ -291,8 +344,8 @@ export default function EquipmentReservation() {
                               <Button
                                 variant="outline"
                                 size="icon"
-                                //onClick={() => handleAction(user.id, 'accept')}
-                                //disabled={user.status !== 'pending'}
+                                onClick={() => handleAction(reservation.id, 'accepted')}
+                                disabled={reservation.status !== 'pending'}
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -308,8 +361,8 @@ export default function EquipmentReservation() {
                               <Button
                                 variant="outline"
                                 size="icon"
-                                //onClick={() => handleAction(user.id, 'deny')}
-                                //disabled={user.status !== 'pending'}
+                                onClick={() => handleAction(reservation.id, 'denied')}
+                                disabled={reservation.status !== 'pending'}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -325,7 +378,7 @@ export default function EquipmentReservation() {
                               <Button
                                 variant="outline"
                                 size="icon"
-                                //onClick={() => handleAction(user.id, 'delete')}
+                                onClick={() => handleDelete(reservation.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
