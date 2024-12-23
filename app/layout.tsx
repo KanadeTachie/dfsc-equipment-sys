@@ -5,6 +5,7 @@ import "./globals.css";
 import QueryProvider from "@/components/query-provider";
 import { GlobalProvider } from "./GlobalProvider";
 import { Toaster } from "@/components/ui/toaster";
+import { Analytics } from "@vercel/analytics/react"
 
 const inter = Inter({ subsets: ["latin"] });
 
