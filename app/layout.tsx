@@ -26,6 +26,7 @@ export default function RootLayout({
           <QueryProvider>
             {/* <Header /> */}
             {children}
+            <Analytics />
           </QueryProvider>
         </GlobalProvider>
         <Toaster />
